@@ -1,71 +1,66 @@
-# Alembic Migration Plan: Using pyproject.toml + Auto-Migrations
+# Alembic 迁移计划：使用 pyproject.toml + 自动迁移
 
-**English | [中文](alembic-pyproject-setup-zh.md)**
+## 概述
 
-## Overview
+为 backend 项目从零开始配置 Alembic，使用现代的 `pyproject.toml` 配置方式（不使用 `alembic.ini`），并启用：
+1. **autogenerate 功能**：自动检测模型变化生成迁移
+2. **应用启动时自动运行迁移**：FastAPI 启动时自动执行待处理的迁移
 
-Configure Alembic for the `backend` project from scratch, utilizing the modern `pyproject.toml` configuration method (avoiding `alembic.ini`), and enabling:
+## 环境信息
 
-1. **Autogenerate**: Automatically detect model changes to generate migrations.
-2. **Auto-run on Startup**: Automatically execute pending migrations when FastAPI starts.
+- **数据库**：PostgreSQL 16 (localhost:54321/electric)
+- **驱动**：asyncpg (异步)
+- **ORM**：SQLModel + SQLAlchemy 2.0
+- **Alembic 版本**：>= 1.17.2 (支持 pyproject.toml 配置)
+- **现有模型**：app/models.py (Todo)
 
-## Environment Information
+## 实施步骤
 
-* **Database**: PostgreSQL 16 (localhost:54321/electric)
-* **Driver**: asyncpg (Async)
-* **ORM**: SQLModel + SQLAlchemy 2.0
-* **Alembic Version**: >= 1.17.2 (Supports pyproject.toml config)
-* **Existing Models**: app/models.py (Todo)
+### 第 1 步：初始化 Alembic 环境
 
-## Implementation Steps
-
-### Step 1: Initialize Alembic Environment
-
-Initialize Alembic using the `pyproject` template:
+使用 `pyproject` 模板初始化 Alembic：
 
 ```bash
 cd backend
 uv run alembic init --template pyproject migrations
-
 ```
 
-This will create:
+这会创建：
+- `migrations/` 目录
+- `migrations/env.py`（需手动修改以支持异步）
+- `migrations/script.py.mako`
+- `migrations/versions/` 目录
+- 在 `pyproject.toml` 中添加 `[tool.alembic]` 配置节
 
-* `migrations/` directory
-* `migrations/env.py` (Requires manual modification to support async)
-* `migrations/script.py.mako`
-* `migrations/versions/` directory
-* Add a `[tool.alembic]` section to `pyproject.toml`
-
-**Note**: An `alembic.ini` file will **not** be created (as requested).
+**注意**：不会创建 `alembic.ini` 文件（符合要求）
 
 ---
 
-### Step 2: Configure pyproject.toml
+### 第 2 步：配置 pyproject.toml
 
-Append the following configuration to the end of `backend/pyproject.toml`:
+在 `backend/pyproject.toml` 末尾添加以下配置：
 
 ```toml
 [tool.alembic]
-# Script location
+# 迁移脚本位置
 script_location = "migrations"
 
-# File naming template (using date-time prefix)
+# 文件命名模板（使用日期时间前缀）
 file_template = "%%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
 
-# Additional sys.path
+# 额外的 sys.path
 prepend_sys_path = ["."]
 
-# Timezone
+# 时区
 timezone = "UTC"
 
-# Output encoding
+# 输出编码
 output_encoding = "utf-8"
 
-# Database URL (Can be overridden by env vars)
+# 数据库 URL（可被环境变量覆盖）
 sqlalchemy.url = "postgresql+asyncpg://postgres:password@localhost:54321/electric"
 
-# Automatic code formatting
+# 自动代码格式化
 [[tool.alembic.post_write_hooks]]
 name = "black"
 type = "console_scripts"
@@ -78,50 +73,43 @@ dev = ["black>=24.0.0"]
 [tool.black]
 line-length = 79
 target-version = ['py312']
-
 ```
 
-Install Black development dependency:
+安装 Black 开发依赖：
 
 ```bash
 cd backend
 uv sync --extra dev
-
 ```
 
 ---
 
-### Step 3: Configure Async Support
+### 第 3 步：配置异步支持
 
-Modify `backend/migrations/env.py` to support asynchronous database operations:
+修改 `backend/migrations/env.py` 以支持异步数据库：
 
-**Key Changes**:
+**关键修改**：
 
-1. **Import Dependencies** (Top of file):
-
+1. **导入依赖**（文件顶部）：
 ```python
 import asyncio
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy import pool
-
 ```
 
-2. **Configure target_metadata** (Find `target_metadata = None` and replace with):
-
+2. **配置 target_metadata**（找到 `target_metadata = None`，替换为）：
 ```python
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlmodel import SQLModel
-from app.models import Todo  # Import all models
+from app.models import Todo  # 导入所有模型
 
 target_metadata = SQLModel.metadata
-
 ```
 
-3. **Create Async Run Function** (Replace the `run_migrations_online()` function):
-
+3. **创建异步运行函数**（替换 `run_migrations_online()` 函数）：
 ```python
 def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
@@ -133,7 +121,7 @@ async def run_migrations_online():
     """Run migrations in 'online' mode with async support."""
     configuration = config.get_section(config.config_ini_section)
 
-    # Prioritize DATABASE_URL from environment variables
+    # 优先使用环境变量中的 DATABASE_URL
     configuration["sqlalchemy.url"] = os.getenv(
         "DATABASE_URL",
         configuration["sqlalchemy.url"]
@@ -149,24 +137,21 @@ async def run_migrations_online():
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()
-
 ```
 
-4. **Update Main Execution Logic** (End of file):
-
+4. **更新主执行逻辑**（文件末尾）：
 ```python
 if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_migrations_online())
-
 ```
 
 ---
 
-### Step 4: Create Auto-Migration Runner
+### 第 4 步：创建自动迁移运行器
 
-Create a new file `backend/app/alembic_runner.py`:
+创建新文件 `backend/app/alembic_runner.py`：
 
 ```python
 """Auto-run Alembic migrations on FastAPI startup."""
@@ -181,13 +166,13 @@ from sqlalchemy import pool
 
 logger = logging.getLogger(__name__)
 
-# Read config from environment variables
+# 从环境变量读取配置
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:password@localhost:54321/electric"
 )
 
-# Whether to run migrations on startup (can be disabled via env var)
+# 是否在启动时自动运行迁移（可通过环境变量关闭）
 RUN_MIGRATIONS_ON_STARTUP = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower() == "true"
 
 
@@ -199,27 +184,27 @@ async def run_migrations():
 
     logger.info("Running database migrations...")
 
-    # Get migrations directory path
+    # 获取 migrations 目录路径
     backend_dir = Path(__file__).parent.parent
     alembic_ini = backend_dir / "pyproject.toml"
 
-    # Create Alembic config
+    # 创建 Alembic 配置
     alembic_cfg = Config(str(alembic_ini))
     alembic_cfg.set_main_option("script_location", str(backend_dir / "migrations"))
 
-    # Read DB URL from environment variable
+    # 从环境变量读取数据库 URL
     configuration = {
         "sqlalchemy.url": DATABASE_URL
     }
 
-    # Import target_metadata
+    # 导入 target_metadata
     import sys
     sys.path.insert(0, str(backend_dir))
     from sqlmodel import SQLModel
     from app.models import Todo
     target_metadata = SQLModel.metadata
 
-    # Create async engine
+    # 创建异步引擎
     from alembic.runtime.environment import EnvironmentContext
     from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -236,7 +221,7 @@ async def run_migrations():
         )
 
         def upgrade(rev, context):
-            # Auto upgrade to latest version
+            # 自动升级到最新版本
             return context.script._upgrade_revs("head", rev)
 
         context.configure(
@@ -258,30 +243,26 @@ async def run_migrations():
     except Exception as e:
         logger.error(f"Migration failed: {e}")
         raise
-
 ```
 
-**Key File**: `backend/app/alembic_runner.py`
+**关键文件**：`backend/app/alembic_runner.py`
 
 ---
 
-### Step 5: Integrate into FastAPI Startup
+### 第 5 步：集成到 FastAPI 启动流程
 
-Modify `backend/app/main.py` to add a lifespan context manager:
+修改 `backend/app/main.py`，添加 lifespan 上下文管理器：
 
-**Import at the top**:
-
+**在文件顶部导入**：
 ```python
 from contextlib import asynccontextmanager
 from app.alembic_runner import run_migrations
 import logging
 
 logger = logging.getLogger(__name__)
-
 ```
 
-**Add lifespan function** (Before `app = FastAPI()`):
-
+**添加 lifespan 函数**（在 `app = FastAPI()` 之前）：
 ```python
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -300,70 +281,63 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Cleanup if needed
     pass
-
 ```
 
-**Modify FastAPI Initialization** (Replace `app = FastAPI()` around line 14):
-
+**修改 FastAPI 初始化**（将第 14 行的 `app = FastAPI()` 替换为）：
 ```python
 app = FastAPI(lifespan=lifespan)
-
 ```
 
-**Key File**: `backend/app/main.py`
+**关键文件**：`backend/app/main.py` (line 14)
 
 ---
 
-### Step 6: Add Environment Variable Configuration
+### 第 6 步：添加环境变量配置
 
-Create a `backend/.env` file:
+创建 `backend/.env` 文件：
 
 ```env
-# Database Connection
+# 数据库连接
 DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:54321/electric
 
-# ElectricSQL Service Address
+# ElectricSQL 服务地址
 ELECTRIC_URL=http://localhost:3000
 
-# Run migrations on startup (Optional, defaults to true)
+# 是否在启动时自动运行迁移（可选，默认为 true）
 # RUN_MIGRATIONS_ON_STARTUP=true
-
 ```
 
-Update `backend/app/db.py` to load the `.env` file (Add to top of file):
+更新 `backend/app/db.py` 以加载 .env 文件（在文件顶部添加）：
 
 ```python
 import os
 from dotenv import load_dotenv
 
-# Load .env file
+# 加载 .env 文件
 load_dotenv()
-
 ```
 
-**Key File**: `backend/app/db.py`
+**关键文件**：`backend/app/db.py`
 
 ---
 
-### Step 7: Generate and Apply Initial Migration
+### 第 7 步：生成并应用初始迁移
 
-Ensure Docker services are running:
+确保 Docker 服务运行：
 
 ```bash
-# From project root
+# 从项目根目录
 docker-compose up -d
-
 ```
 
-Generate initial migration:
+生成初始迁移：
 
 ```bash
 cd backend
 uv run alembic revision --autogenerate -m "Initial migration - create todos table"
-
 ```
 
-Check the generated migration file (`migrations/versions/*.py`) to confirm it contains:
+检查生成的迁移文件（`migrations/versions/*.py`），确认包含：
 
 ```python
 def upgrade() -> None:
@@ -379,207 +353,191 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table('todos')
-
 ```
 
-Apply migration:
+应用迁移：
 
 ```bash
 uv run alembic upgrade head
-
 ```
 
-Verify:
+验证：
 
 ```bash
-# View current version
+# 查看当前版本
 uv run alembic current
 
-# Check database tables
+# 查看数据库表
 docker exec -it electric_expo_db_quickstart-postgres-1 psql -U postgres -d electric -c "\dt"
-
 ```
 
 ---
 
-### Step 8: Test Auto-Migration Functionality
+### 第 8 步：测试自动迁移功能
 
-**Test Autogenerate**:
+**测试 autogenerate**：
 
-Modify `app/models.py` by adding a new field:
+修改 `app/models.py`，添加一个新字段：
 
 ```python
 class Todo(SQLModel, table=True):
-    # ... existing fields
-    priority: Optional[str] = Field(default="normal")  # New field
-
+    # ... 现有字段
+    priority: Optional[str] = Field(default="normal")  # 新字段
 ```
 
-Generate migration:
+生成迁移：
 
 ```bash
 cd backend
 uv run alembic revision --autogenerate -m "Add priority field to todos"
-
 ```
 
-Apply migration:
+应用迁移：
 
 ```bash
 uv run alembic upgrade head
-
 ```
 
-**Test Startup Auto-Migration**:
+**测试启动时自动迁移**：
 
-Rollback migration:
+回滚迁移：
 
 ```bash
 uv run alembic downgrade -1
-
 ```
 
-Start FastAPI application (It should run migrations automatically):
+启动 FastAPI 应用（应自动运行迁移）：
 
 ```bash
 cd backend
 uv run python -m app.main
-
 ```
 
-Observe log output, it should contain:
-
+观察日志输出，应包含：
 ```
 INFO:     Running database migrations on startup...
 INFO:     Migrations completed successfully
 INFO:     Application startup complete.
-
 ```
 
 ---
 
-## Files to Create/Modify
+## 需要创建/修改的文件
 
-### New Files:
+### 新建文件：
 
-1. **`backend/app/alembic_runner.py`** - Auto-migration runner.
-2. **`backend/.env`** - Environment variable config.
-3. **`backend/migrations/env.py`** - Alembic env config (Generated by command, requires manual edit).
-4. **`backend/migrations/versions/*.py`** - Migration files (Auto-generated).
+1. **`backend/app/alembic_runner.py`** - 自动迁移运行器
+2. **`backend/.env`** - 环境变量配置
+3. **`backend/migrations/env.py`** - Alembic 环境配置（由命令生成，需手动修改）
+4. **`backend/migrations/versions/*.py`** - 迁移文件（由命令自动生成）
 
-### Modified Files:
+### 修改文件：
 
-1. **`backend/pyproject.toml`** - Add `[tool.alembic]` config, Black config, dev dependencies.
-2. **`backend/app/main.py`** - Add lifespan context manager.
-3. **`backend/app/db.py`** - Add dotenv loading.
+1. **`backend/pyproject.toml`** - 添加 `[tool.alembic]` 配置、Black 配置、开发依赖
+2. **`backend/app/main.py`** - 添加 lifespan 上下文管理器
+3. **`backend/app/db.py`** - 添加 dotenv 加载
 
 ---
 
-## Daily Usage Commands
+## 日常使用命令
 
 ```bash
 cd backend
 
-# Generate migration (based on model changes)
-uv run alembic revision --autogenerate -m "Description of change"
+# 生成迁移（基于模型变化）
+uv run alembic revision --autogenerate -m "描述变更"
 
-# Manually create empty migration
-uv run alembic revision -m "Description"
+# 手动创建空迁移
+uv run alembic revision -m "描述"
 
-# Apply all migrations
+# 应用所有迁移
 uv run alembic upgrade head
 
-# Apply next migration
+# 应用下一个迁移
 uv run alembic upgrade +1
 
-# Rollback one version
+# 回滚一个版本
 uv run alembic downgrade -1
 
-# Rollback all migrations
+# 回滚所有迁移
 uv run alembic downgrade base
 
-# View current version
+# 查看当前版本
 uv run alembic current
 
-# View migration history
+# 查看迁移历史
 uv run alembic history
 
-# Check for undetected model changes
+# 检查是否有未生成的迁移
 uv run alembic check
-
 ```
 
 ---
 
-## Important Notes
+## 注意事项
 
-1. **Always review auto-generated migrations**: `autogenerate` is not perfect; always review the generated files.
-2. **Use descriptive migration messages**: e.g., "Add priority field to todos" instead of just "update".
-3. **Test upgrade and downgrade**: Ensure you can roll back.
-4. **Commit migration files to version control**: `git add migrations/versions/`.
-5. **Backup database in production**: Backup before applying migrations.
-6. **Environment Variable Priority**: DATABASE_URL > pyproject.toml config.
-7. **Disable Auto-Migration**: Set `RUN_MIGRATIONS_ON_STARTUP=false`.
+1. **始终检查自动生成的迁移**：autogenerate 不是完美的，务必审查生成的文件
+2. **使用描述性的迁移消息**：例如 "Add priority field to todos" 而不是 "update"
+3. **测试 upgrade 和 downgrade**：确保可以回滚
+4. **提交迁移文件到版本控制**：`git add migrations/versions/`
+5. **生产环境备份数据库**：应用迁移前先备份
+6. **环境变量优先级**：DATABASE_URL > pyproject.toml 配置
+7. **可禁用自动迁移**：设置 `RUN_MIGRATIONS_ON_STARTUP=false`
 
 ---
 
-## Troubleshooting
+## 故障排查
 
-### Issue 1: Black formatting failed
+### 问题 1：Black 格式化失败
 
 ```bash
-# Manually install Black
+# 手动安装 Black
 cd backend
 uv add --dev black
-
 ```
 
-### Issue 2: Migration files not auto-formatted
+### 问题 2：迁移文件未自动格式化
 
-Check if the `[tool.alembic.post_write_hooks]` section in `pyproject.toml` is correct.
+检查 `pyproject.toml` 中的 `[tool.alembic.post_write_hooks]` 配置是否正确
 
-### Issue 3: Migration failed on startup
+### 问题 3：启动时迁移失败
 
-Check logs to confirm:
+检查日志，确认：
+- Docker 服务正在运行
+- DATABASE_URL 环境变量正确
+- 数据库连接正常
 
-* Docker services are running.
-* DATABASE_URL environment variable is correct.
-* Database connection is normal.
-
-Temporarily disable auto-migration:
-
+可临时禁用自动迁移：
 ```bash
 export RUN_MIGRATIONS_ON_STARTUP=false
-
 ```
 
-### Issue 4: autogenerate produces empty files
+### 问题 4：autogenerate 生成空文件
 
-Confirm:
-
-* `migrations/env.py` imports all models.
-* `target_metadata = SQLModel.metadata` is set.
-* Database connection is correct.
-
----
-
-## Verification Checklist
-
-After implementation, verify the following:
-
-* [ ] `uv run alembic current` shows the current version.
-* [ ] `uv run alembic history` shows migration history.
-* [ ] `uv run alembic check` detects model changes.
-* [ ] FastAPI automatically runs migrations on startup (check logs).
-* [ ] Migration files are automatically formatted by Black.
-* [ ] Can rollback migrations: `uv run alembic downgrade -1`.
-* [ ] Can re-apply migrations: `uv run alembic upgrade head`.
-* [ ] The `todos` table exists in PostgreSQL.
-* [ ] `autogenerate` correctly generates migrations after modifying models.
+确认：
+- `migrations/env.py` 导入了所有模型
+- `target_metadata = SQLModel.metadata`
+- 数据库连接正确
 
 ---
 
-## Related Documentation
+## 验证清单
 
-* **[Alembic Official Docs - pyproject.toml Configuration](https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file)**
-* **[Complete Project Migration Guide](https://www.google.com/search?q=backend/docs/complete-migration-guide.md)**
+完成实施后，验证以下功能：
+
+- [ ] `uv run alembic current` 显示当前版本
+- [ ] `uv run alembic history` 显示迁移历史
+- [ ] `uv run alembic check` 能检测模型变化
+- [ ] 启动 FastAPI 时自动运行迁移（检查日志）
+- [ ] 迁移文件自动被 Black 格式化
+- [ ] 可以回滚迁移：`uv run alembic downgrade -1`
+- [ ] 可以重新应用：`uv run alembic upgrade head`
+- [ ] todos 表存在于 PostgreSQL 中
+- [ ] 修改模型后，autogenerate 能正确生成迁移
+
+---
+
+## 相关文档
+
+- **[Alembic 官方文档 - pyproject.toml 配置](https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file)**
+- **[项目完整迁移指南](backend/docs/complete-migration-guide.md)**

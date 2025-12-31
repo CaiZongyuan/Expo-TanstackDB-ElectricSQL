@@ -1,8 +1,11 @@
 {
+    "_comment": "Windows has to use cmd /c npx. In Mac/Linux please remove cmd wrapper and use npx directly",
     "mcpServers": {
         "heroui-native": {
-            "command": "npx",
+            "command": "cmd",
             "args": [
+                "/c",
+                "npx",
                 "-y",
                 "@heroui/native-mcp@latest"
             ]

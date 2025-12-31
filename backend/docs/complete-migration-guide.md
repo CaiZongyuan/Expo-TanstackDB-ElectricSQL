@@ -1,261 +1,282 @@
-# Alembic 数据库迁移完整指南
+# Complete Guide to Alembic Database Migrations
 
-> 新手友好的 Alembic 数据库迁移教程 - 从零开始到熟练使用
+**English | [中文](complete-migration-guide-zh.md)**
 
-本教程基于 Alembic 官方文档编写，结合项目实际情况，提供从基础到高级的完整指南。
+> Beginner-friendly Alembic Database Migration Tutorial - From Scratch to Proficiency
 
----
-
-## 📋 目录
-
-- [快速开始](#快速开始)
-- [Alembic 基础概念](#alembic-基础概念)
-- [首次设置](#首次设置)
-- [日常使用](#日常使用)
-- [自动生成迁移详解](#自动生成迁移详解)
-- [高级配置](#高级配置)
-- [常见问题](#常见问题)
-- [最佳实践](#最佳实践)
-- [常用命令速查](#常用命令速查)
+This tutorial is based on the official Alembic documentation, combined with actual project requirements, providing a complete guide from basics to advanced usage.
 
 ---
 
-## ⚡ 快速开始
+## 📋 Table of Contents
 
-### 一键复制命令（首次设置）
+* [Quick Start](https://www.google.com/search?q=%23quick-start)
+* [Basic Alembic Concepts](https://www.google.com/search?q=%23basic-alembic-concepts)
+* [Initial Setup](https://www.google.com/search?q=%23initial-setup)
+* [Daily Usage](https://www.google.com/search?q=%23daily-usage)
+* [Deep Dive: Autogenerate](https://www.google.com/search?q=%23deep-dive-autogenerate)
+* [Advanced Configuration](https://www.google.com/search?q=%23advanced-configuration)
+* [FAQ](https://www.google.com/search?q=%23faq)
+* [Best Practices](https://www.google.com/search?q=%23best-practices)
+* [Command Cheatsheet](https://www.google.com/search?q=%23command-cheatsheet)
+
+---
+
+## ⚡ Quick Start
+
+### Quick Setup Commands (First Time)
 
 ```bash
-# 1. 启动数据库
+# 1. Start the database
 docker-compose up -d
 
-# 2. 初始化 Alembic
+# 2. Initialize Alembic
 cd backend
 uv run alembic init migrations
 
-# 3. 配置文件（需要手动编辑，见下方详细步骤）
-# - alembic.ini: 修改数据库连接
-# - migrations/env.py: 导入模型和配置异步
+# 3. Configuration Files (Requires manual editing, see steps below)
+# - alembic.ini: Modify database connection
+# - migrations/env.py: Import models and configure async
 
-# 4. 生成迁移
+# 4. Generate migration
 uv run alembic revision --autogenerate -m "Initial migration"
 
-# 5. 应用迁移
+# 5. Apply migration
 uv run alembic upgrade head
+
 ```
 
-### 日常使用命令
+### Daily Usage Commands
 
 ```bash
-# 修改模型后，生成并应用迁移
+# After modifying models, generate and apply migrations
 cd backend
-uv run alembic revision --autogenerate -m "描述变更"
+uv run alembic revision --autogenerate -m "Describe the change"
 uv run alembic upgrade head
 
-# 查看当前版本
+# View current version
 uv run alembic current
 
-# 查看迁移历史
+# View migration history
 uv run alembic history
+
 ```
 
 ---
 
-## 📚 Alembic 基础概念
+## 📚 Basic Alembic Concepts
 
-### 什么是迁移环境？
+### What is a Migration Environment?
 
-Alembic 的使用从创建**迁移环境**开始。这是一个特定于应用程序的脚本目录，只需创建一次，然后与应用程序的源代码一起维护。
+The usage of Alembic starts with creating a **Migration Environment**. This is a directory of scripts specific to your application that is created once and then maintained alongside your application's source code.
 
-### 迁移环境目录结构
+### Migration Environment Directory Structure
 
 ```
 backend/
-├── alembic.ini           # Alembic 主配置文件
-├── pyproject.toml        # 现代 Python 项目配置文件
-└── migrations/           # 迁移环境目录（可自定义名称）
-    ├── env.py           # 每次运行迁移时执行的 Python 脚本
-    ├── README           # 说明文件
-    ├── script.py.mako   # 生成新迁移文件的 Mako 模板
-    └── versions/        # 存放迁移脚本的目录
+├── alembic.ini           # Main Alembic configuration file
+├── pyproject.toml        # Modern Python project configuration
+└── migrations/           # Migration environment directory (name customizable)
+    ├── env.py            # Python script executed every time migrations run
+    ├── README            # Readme file
+    ├── script.py.mako    # Mako template for generating new migration files
+    └── versions/         # Directory storing migration scripts
         ├── 3512b954651e_add_account.py
         ├── 2b1ae634e5cd_add_order_id.py
         └── 3adcc9a56557_rename_username_field.py
+
 ```
 
-### 各文件说明
+### File Explanations
 
-| 文件/目录 | 说明 |
-|-----------|------|
-| `alembic.ini` | Alembic 的主配置文件，包含数据库 URL、脚本位置等配置 |
-| `migrations/env.py` | 运行迁移时执行的脚本，负责配置数据库连接和迁移引擎 |
-| `migrations/script.py.mako` | Mako 模板文件，用于生成新的迁移脚本 |
-| `migrations/versions/` | 存放具体迁移脚本的目录 |
+| File/Directory | Description |
+| --- | --- |
+| `alembic.ini` | The main configuration file for Alembic, containing the database URL, script location, etc. |
+| `migrations/env.py` | The script executed when running migrations, responsible for configuring the database connection and migration engine. |
+| `migrations/script.py.mako` | The Mako template file used to generate new migration scripts. |
+| `migrations/versions/` | The directory where specific migration scripts are stored. |
 
 ---
 
-## 🎯 首次设置
+## 🎯 Initial Setup
 
-### 第一步：启动数据库
+### Step 1: Start the Database
 
-在**项目根目录**打开终端，运行：
+Open a terminal in the **project root directory** and run:
 
 ```bash
 docker-compose up -d
+
 ```
 
-✅ 这会启动 PostgreSQL 和 Electric SQL 服务
+✅ This will start the PostgreSQL and Electric SQL services.
 
-**验证服务运行**：
+**Verify services are running**:
+
 ```bash
 docker-compose ps
+
 ```
 
 ---
 
-### 第二步：初始化 Alembic
+### Step 2: Initialize Alembic
 
-进入 `backend` 目录：
+Enter the `backend` directory:
 
 ```bash
 cd backend
 uv run alembic init migrations
+
 ```
 
-✅ 这会创建：
-- `migrations/` 目录
-- `migrations/env.py` - 环境配置文件
-- `migrations/script.py.mako` - 迁移模板
-- `migrations/versions/` - 迁移脚本目录
-- `alembic.ini` - Alembic 配置文件
+✅ This creates:
 
-### 使用不同模板
+* `migrations/` directory
+* `migrations/env.py` - Environment configuration
+* `migrations/script.py.mako` - Migration template
+* `migrations/versions/` - Migration script directory
+* `alembic.ini` - Alembic configuration file
 
-Alembic 提供多种环境模板：
+### Using Different Templates
+
+Alembic provides various environment templates:
 
 ```bash
-# 查看可用模板
+# View available templates
 uv run alembic list_templates
+
 ```
 
-可用模板：
+Available templates:
 
-| 模板 | 说明 |
-|------|------|
-| `generic` | 通用单数据库配置（默认） |
-| `pyproject` | 符合 PEP-621 的配置，使用 pyproject.toml |
-| `async` | 支持异步数据库的通用配置 |
-| `multidb` | 多数据库配置 |
+| Template | Description |
+| --- | --- |
+| `generic` | Generic single-database configuration (default) |
+| `pyproject` | PEP-621 compliant configuration using pyproject.toml |
+| `async` | Generic configuration supporting asynchronous databases |
+| `multidb` | Multi-database configuration |
 
-使用特定模板创建：
+To create using a specific template:
 
 ```bash
-# 使用 async 模板（本项目推荐）
+# Use the async template (Recommended for this project)
 uv run alembic init --template async migrations
+
 ```
 
 ---
 
-### 第三步：配置数据库连接
+### Step 3: Configure Database Connection
 
-打开 `backend/alembic.ini`，找到 `sqlalchemy.url` 配置：
+Open `backend/alembic.ini` and find the `sqlalchemy.url` setting:
 
 ```ini
-# 默认配置
+# Default configuration
 sqlalchemy.url = driver://user:pass@localhost/dbname
+
 ```
 
-**替换为项目配置**：
+**Replace with project configuration**:
 
 ```ini
 sqlalchemy.url = postgresql+asyncpg://postgres:password@localhost:54321/electric
+
 ```
 
-💡 **提示**：这是连接本地 Docker 数据库的地址
+💡 **Tip**: This is the address to connect to the local Docker database.
 
-#### 数据库 URL 格式说明
+#### Database URL Format Explanation
 
-**PostgreSQL 示例：**
+**PostgreSQL Examples:**
 
 ```ini
-# 基本格式
+# Basic format
 postgresql://scott:tiger@localhost:5432/mydb
 
-# 使用 asyncpg 驱动（异步）
+# Using asyncpg driver (Async)
 postgresql+asyncpg://scott:tiger@localhost:5432/mydb
 
-# 使用 psycopg2 驱动（同步）
+# Using psycopg2 driver (Sync)
 postgresql+psycopg2://scott:tiger@localhost:5432/mydb
+
 ```
 
-#### 特殊字符转义
+#### Special Character Escaping
 
-如果密码中包含特殊字符（如 `%`、`@`），需要进行双重转义：
+If your password contains special characters (like `%`, `@`), you need double escaping:
 
-1. **URL 转义**（SQLAlchemy 要求）：
-   - `%` → `%25`
-   - `@` → `%40`
+1. **URL Escaping** (Required by SQLAlchemy):
+* `%` → `%25`
+* `@` → `%40`
 
-2. **ConfigParser 转义**（alembic.ini 要求）：
-   - 将 `%` 替换为 `%%`
 
-**示例：** 密码为 `P@ssw%rd`
+2. **ConfigParser Escaping** (Required by alembic.ini):
+* Replace `%` with `%%`
+
+
+
+**Example:** Password is `P@ssw%rd`
 
 ```python
-# Python 中生成正确转义的 URL
+# Python code to generate the correctly escaped URL
 import urllib.parse
 
 password = "P@ssw%rd"
-# 第一步：URL 转义
+# Step 1: URL Escape
 url_escaped = urllib.parse.quote_plus(password)
-# 结果：P%40ssw%25rd
+# Result: P%40ssw%25rd
 
-# 第二步：ConfigParser 转义
+# Step 2: ConfigParser Escape
 config_escaped = url_escaped.replace("%", "%%")
-# 结果：P%%40ssw%%25rd
+# Result: P%%40ssw%%25rd
 
-# 最终配置
+# Final Configuration
 # sqlalchemy.url = postgresql://scott:P%%40ssw%%25rd@localhost:5432/mydb
+
 ```
 
 ---
 
-### 第四步：配置模型导入
+### Step 4: Configure Model Import
 
-打开 `backend/migrations/env.py`，找到 `target_metadata` 配置：
+Open `backend/migrations/env.py` and find the `target_metadata` configuration:
 
 ```python
-# 原始内容
+# Original content
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = None
+
 ```
 
-**替换为**：
+**Replace with**:
 
 ```python
-# 导入项目路径
+# Import project path
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 导入 SQLModel 和所有模型
+# Import SQLModel and all models
 from sqlmodel import SQLModel
-from app.models import Todo  # 如果有更多模型，都要导入
+from app.models import Todo  # If there are more models, import them all
 
-# 设置元数据
+# Set metadata
 target_metadata = SQLModel.metadata
+
 ```
 
-💡 **为什么要这样做？**
-根据 [Alembic 官方文档](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)，Alembic 需要访问您的模型元数据才能自动检测变化。
+💡 **Why do this?**
+According to the [Alembic Official Docs](https://alembic.sqlalchemy.org/en/latest/autogenerate.html), Alembic needs access to your model metadata to automatically detect changes.
 
 ---
 
-### 第五步：配置异步支持
+### Step 5: Configure Async Support
 
-在同一个 `env.py` 文件中，找到 `run_migrations_online()` 函数，**完整替换为**：
+In the same `env.py` file, find the `run_migrations_online()` function and **completely replace it with**:
 
 ```python
 def do_run_migrations(connection):
@@ -280,18 +301,20 @@ async def run_migrations_online():
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()
+
 ```
 
-然后找到文件**最后几行**的调用部分：
+Then find the call section at the **end of the file**:
 
 ```python
 if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
+
 ```
 
-**替换为**：
+**Replace with**:
 
 ```python
 if context.is_offline_mode():
@@ -299,31 +322,33 @@ if context.is_offline_mode():
 else:
     import asyncio
     asyncio.run(run_migrations_online())
+
 ```
 
 ---
 
-### 第六步：生成初始迁移
+### Step 6: Generate Initial Migration
 
 ```bash
 uv run alembic revision --autogenerate -m "Initial migration"
+
 ```
 
-✅ 这会在 `migrations/versions/` 生成一个迁移文件
+✅ This generates a migration file in `migrations/versions/`.
 
-**Alembic 自动检测的内容**：
+**What Alembic Automatically Detects**:
 
-| 类型 | 说明 |
-|------|------|
-| ✅ **完全支持** | 表的添加/删除、列的添加/删除、列的可空状态变化、索引和外键约束的基本变化 |
-| ⚠️ **可选检测** | 列类型变化（默认启用）、服务器默认值变化（需配置） |
-| ❌ **无法检测** | 表名/列名重命名、约束重命名、匿名约束变化 |
+| Type | Description |
+| --- | --- |
+| ✅ **Fully Supported** | Table add/drop, Column add/drop, Column nullable status change, Basic Index and Foreign Key constraints |
+| ⚠️ **Optional Detection** | Column type changes (enabled by default), Server default value changes (requires config) |
+| ❌ **Cannot Detect** | Table/Column renaming, Constraint renaming, Anonymous constraint changes |
 
 ---
 
-### 第七步：检查生成的迁移
+### Step 7: Review Generated Migration
 
-打开 `migrations/versions/xxxx_initial_migration.py`，确认包含创建表的代码：
+Open `migrations/versions/xxxx_initial_migration.py` and confirm it includes code to create the table:
 
 ```python
 """Initial migration
@@ -344,7 +369,7 @@ import sqlalchemy as sa
 
 
 def upgrade() -> None:
-    # 创建 todos 表
+    # Create todos table
     op.create_table('todos',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('text', sa.String(), nullable=False),
@@ -357,103 +382,110 @@ def upgrade() -> None:
     )
 
 def downgrade() -> None:
-    # 删除 todos 表
+    # Drop todos table
     op.drop_table('todos')
+
 ```
 
-⚠️ **重要**：始终检查自动生成的代码是否正确！Alembic 不是完美的。
+⚠️ **Important**: Always review auto-generated code for correctness! Alembic is not perfect.
 
-**常用迁移操作**：
+**Common Migration Operations**:
 
-| 操作 | 说明 |
-|------|------|
-| `op.create_table()` | 创建表 |
-| `op.drop_table()` | 删除表 |
-| `op.add_column()` | 添加列 |
-| `op.drop_column()` | 删除列 |
-| `op.alter_column()` | 修改列 |
-| `op.create_index()` | 创建索引 |
-| `op.drop_index()` | 删除索引 |
-| `op.create_foreign_key()` | 创建外键 |
-| `op.drop_foreign_key()` | 删除外键 |
+| Operation | Description |
+| --- | --- |
+| `op.create_table()` | Create table |
+| `op.drop_table()` | Drop table |
+| `op.add_column()` | Add column |
+| `op.drop_column()` | Drop column |
+| `op.alter_column()` | Alter column |
+| `op.create_index()` | Create index |
+| `op.drop_index()` | Drop index |
+| `op.create_foreign_key()` | Create foreign key |
+| `op.drop_foreign_key()` | Drop foreign key |
 
 ---
 
-### 第八步：应用迁移
+### Step 8: Apply Migrations
 
 ```bash
 uv run alembic upgrade head
+
 ```
 
-✅ 这会在数据库中创建表
+✅ This creates the tables in the database.
 
-**预期输出**：
+**Expected Output**:
 
 ```
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
 INFO  [alembic.runtime.migration] Running upgrade  -> xxxx, Initial migration
+
 ```
 
-**升级选项**：
+**Upgrade Options**:
 
 ```bash
-# 升级到最新版本
+# Upgrade to the latest version
 uv run alembic upgrade head
 
-# 升级到指定版本（使用完整版本号）
+# Upgrade to a specific version (use full revision ID)
 uv run alembic upgrade 1975ea83b712
 
-# 升级到指定版本（使用部分版本号，只要唯一即可）
+# Upgrade to a specific version (partial ID works if unique)
 uv run alembic upgrade 1975
 
-# 相对升级（前进 N 个版本）
+# Relative upgrade (Advance N versions)
 uv run alembic upgrade +2
+
 ```
 
 ---
 
-### 第九步：验证
+### Step 9: Verify
 
 ```bash
-# 查看当前迁移版本
+# View current migration version
 uv run alembic current
 
-# 查看数据库表
+# View database tables
 docker exec -it electric_expo_db_quickstart-postgres-1 psql -U postgres -d electric -c "\dt"
 
-# 查看 todos 表结构
+# View todos table structure
 docker exec -it electric_expo_db_quickstart-postgres-1 psql -U postgres -d electric -c "\d todos"
+
 ```
 
-🎉 **完成！** 数据库已初始化
+🎉 **Complete!** The database is initialized.
 
 ---
 
-## 🔄 日常使用
+## 🔄 Daily Usage
 
-### 修改模型后如何更新数据库？
+### How to update the database after modifying models?
 
-#### 1. 修改模型
+#### 1. Modify Model
 
-例如在 `app/models.py` 中添加新字段：
+For example, add a new field in `app/models.py`:
 
 ```python
 class Todo(SQLModel, table=True):
-    # ... 现有字段
-    priority: Optional[str] = Field(default="normal")  # 新字段
+    # ... existing fields
+    priority: Optional[str] = Field(default="normal")  # New field
+
 ```
 
-#### 2. 生成迁移
+#### 2. Generate Migration
 
 ```bash
 cd backend
 uv run alembic revision --autogenerate -m "Add priority field to todos"
+
 ```
 
-#### 3. 检查生成的迁移
+#### 3. Review Generated Migration
 
-打开新生成的文件，确认变更正确：
+Open the newly generated file and confirm the changes are correct:
 
 ```python
 def upgrade() -> None:
@@ -461,96 +493,103 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('todos', 'priority')
+
 ```
 
-#### 4. 应用迁移
+#### 4. Apply Migration
 
 ```bash
 uv run alembic upgrade head
+
 ```
 
-✅ 数据库已更新！
+✅ Database updated!
 
 ---
 
-### 回滚迁移
+### Rolling Back Migrations
 
 ```bash
-# 回滚一个版本
+# Rollback one version
 uv run alembic downgrade -1
 
-# 回滚到特定版本
+# Rollback to a specific version
 uv run alembic downgrade <revision_id>
 
-# 回滚所有迁移
+# Rollback all migrations
 uv run alembic downgrade base
 
-# 相对降级
+# Relative downgrade
 uv run alembic downgrade -2
+
 ```
 
-**降级内部流程**：
-1. 检查数据库中 `alembic_version` 表的当前版本
-2. 计算从当前版本到目标版本的降级路径
-3. 依次执行每个迁移文件的 `downgrade()` 方法
+**Downgrade Internal Process**:
+
+1. Checks the current version in the `alembic_version` table.
+2. Calculates the downgrade path from the current version to the target version.
+3. Sequentially executes the `downgrade()` method of each migration file.
 
 ---
 
-### 查看迁移信息
+### Viewing Migration Information
 
 ```bash
-# 查看当前版本
+# View current version
 uv run alembic current
 
-# 查看所有迁移
+# View all migrations history
 uv run alembic history
 
-# 查看详细历史
+# View detailed history
 uv run alembic history --verbose
 
-# 查看历史范围
-uv run alembic history -r1975ea:ae1027  # 从 1975ea 到 ae1027
-uv run alembic history -r-3:current      # 最近 3 个版本到当前
-uv run alembic history -r1975ea:        # 从 1975ea 到最新
+# View history range
+uv run alembic history -r1975ea:ae1027  # From 1975ea to ae1027
+uv run alembic history -r-3:current      # Last 3 versions to current
+uv run alembic history -r1975ea:         # From 1975ea to latest
 
-# 查看所有分支
+# View all branches
 uv run alembic branches
 
-# 查看所有头版本
+# View all head revisions
 uv run alembic heads
+
 ```
 
-**输出示例**：
+**Output Example**:
 
 ```
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
 Current revision for postgresql://scott:XXXXX@localhost/test: 1975ea83b712 -> ae1027a6acf (head), Add a column
+
 ```
 
 ---
 
-### 手动创建迁移
+### Manually Creating Migrations
 
-有时需要手动编写迁移（例如数据迁移、复杂变更）：
+Sometimes you need to write migrations manually (e.g., data migrations, complex changes):
 
 ```bash
-# 创建空迁移文件
+# Create an empty migration file
 uv run alembic revision -m "Custom data migration"
+
 ```
 
-然后手动编辑生成的文件：
+Then manually edit the generated file:
 
 ```python
 def upgrade() -> None:
-    # 执行数据迁移
+    # Execute data migration
     from sqlalchemy import table, column
     todos = table('todos',
         column('id', sa.Integer()),
         column('text', sa.String())
     )
 
-    # 批量更新数据
+    # Bulk update data
     connection.execute(
         todos.update()
         .where(todos.c.id == 1)
@@ -558,119 +597,127 @@ def upgrade() -> None:
     )
 
 def downgrade() -> None:
-    # 回滚数据迁移
+    # Rollback data migration
     pass
+
 ```
 
 ---
 
-## 🔍 自动生成迁移详解
+## 🔍 Deep Dive: Autogenerate
 
-### 检查是否有新的迁移
+### Checking for New Migrations
 
-使用 `alembic check` 命令（不生成实际文件）：
+Use the `alembic check` command (does not generate actual files):
 
 ```bash
 uv run alembic check
+
 ```
 
-**有变化时**：
+**When changes exist**:
 
 ```
 FAILED: New upgrade operations detected: [
   ('add_column', None, 'my_table', Column('data', String(), table=<my_table>)),
   ('add_column', None, 'my_table', Column('newcol', Integer(), table=<my_table>))]
+
 ```
 
-**无变化时**：
+**When no changes exist**:
 
 ```
 No new upgrade operations detected.
+
 ```
 
 ---
 
-### 自动生成可以检测的变化
+### Changes Autogenerate Can Detect
 
-| 类型 | 说明 |
-|------|------|
-| ✅ 表的添加/删除 | 完全支持 |
-| ✅ 列的添加/删除 | 完全支持 |
-| ✅ 列的可空状态变化 | 完全支持 |
-| ✅ 索引和唯一约束的基本变化 | 完全支持 |
-| ✅ 外键约束的基本变化 | 完全支持 |
-| ⚠️ 列类型变化 | 默认启用，可通过 `compare_type` 控制 |
-| ⚠️ 服务器默认值变化 | 需设置 `compare_server_default=True` |
+| Type | Description |
+| --- | --- |
+| ✅ Table Add/Drop | Fully supported |
+| ✅ Column Add/Drop | Fully supported |
+| ✅ Column Nullable Status | Fully supported |
+| ✅ Basic Index & Unique Constraints | Fully supported |
+| ✅ Basic Foreign Key Constraints | Fully supported |
+| ⚠️ Column Type Change | Enabled by default, controllable via `compare_type` |
+| ⚠️ Server Default Change | Requires setting `compare_server_default=True` |
 
 ---
 
-### 自动生成无法检测的变化
+### Changes Autogenerate Cannot Detect
 
-| 类型 | 说明 |
-|------|------|
-| ❌ 表名重命名 | 会检测为删除旧表 + 创建新表 |
-| ❌ 列名重命名 | 会检测为删除旧列 + 添加新列 |
-| ❌ 匿名约束 | 需要给约束命名 |
-| ❌ 特殊 SQLAlchemy 类型 | 如 `Enum` 在不支持它的数据库上 |
-| ❌ 某些独立约束 | PRIMARY KEY、EXCLUDE、CHECK 等 |
+| Type | Description |
+| --- | --- |
+| ❌ Table Renaming | Detected as dropping old table + creating new table |
+| ❌ Column Renaming | Detected as dropping old column + adding new column |
+| ❌ Anonymous Constraints | Constraints must be named |
+| ❌ Special SQLAlchemy Types | e.g., `Enum` on databases that don't support it natively |
+| ❌ Certain Standalone Constraints | PRIMARY KEY, EXCLUDE, CHECK, etc. |
 
-**解决方案**：
+**Solutions**:
 
-**方法 1**：手动编辑自动生成的迁移文件
+**Method 1**: Manually edit the autogenerated migration file
 
 ```python
 def upgrade() -> None:
-    # 重命名列（Alembic 会生成删除+添加，需要手动改为重命名）
+    # Rename column (Alembic generates drop+add, manually change to alter_column)
     op.alter_column('todos', 'old_name', new_column_name='new_name')
+
 ```
 
-**方法 2**：创建自定义迁移
+**Method 2**: Create a custom migration
 
 ```bash
 uv run alembic revision -m "Rename column"
-# 然后手动编写迁移代码
+# Then write migration code manually
+
 ```
 
 ---
 
-### 控制自动生成行为
+### Controlling Autogenerate Behavior
 
-#### 配置类型比较
+#### Configuring Type Comparison
 
-**禁用类型比较**：
+**Disable Type Comparison**:
 
 ```python
-# 在 migrations/env.py 中
+# In migrations/env.py
 context.configure(
     # ...
     compare_type = False
 )
+
 ```
 
-**自定义类型比较函数**：
+**Custom Type Comparison Function**:
 
 ```python
 def my_compare_type(context, inspected_column,
                     metadata_column, inspected_type, metadata_type):
-    # 返回 False 表示类型相同
-    # 返回 None 表示使用默认比较逻辑
-    # 返回 True 表示类型不同，需要生成迁移
+    # Return False means types are the same
+    # Return None means use default comparison logic
+    # Return True means types are different, generate migration
     return None
 
 context.configure(
     # ...
     compare_type = my_compare_type
 )
+
 ```
 
-#### 过滤特定对象
+#### Filtering Specific Objects
 
-**过滤特定 schema**：
+**Filter Specific Schemas**:
 
 ```python
 def include_name(name, type_, parent_names):
     if type_ == "schema":
-        # 只包含这些 schema
+        # Only include these schemas
         return name in [None, "schema_one", "schema_two"]
     else:
         return True
@@ -680,16 +727,17 @@ context.configure(
     include_schemas = True,
     include_name = include_name
 )
+
 ```
 
-**过滤特定表**：
+**Filter Specific Tables**:
 
 ```python
 target_metadata = MyModel.metadata
 
 def include_name(name, type_, parent_names):
     if type_ == "table":
-        # 只包含模型中定义的表
+        # Only include tables defined in the model
         return parent_names["schema_qualified_table_name"] in target_metadata.tables
     else:
         return True
@@ -700,13 +748,14 @@ context.configure(
     include_name = include_name,
     include_schemas = True
 )
+
 ```
 
-**基于对象的过滤**：
+**Object-based Filtering**:
 
 ```python
 def include_object(object, name, type_, reflected, compare_to):
-    # 跳过带有 skip_autogenerate 标记的列
+    # Skip columns marked with skip_autogenerate
     if (type_ == "column" and
         not reflected and
         object.info.get("skip_autogenerate", False)):
@@ -718,94 +767,100 @@ context.configure(
     # ...
     include_object = include_object
 )
+
 ```
 
-**使用示例**：
+**Usage Example**:
 
 ```python
-# 在模型中标记要跳过的列
+# Mark column to skip in model
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     name = Column(String)
-    # 这个列不会被 autogenerate 检测
+    # This column will not be detected by autogenerate
     temp_field = Column(String, info={"skip_autogenerate": True})
+
 ```
 
 ---
 
-### 使用多个 MetaData
+### Using Multiple MetaData
 
 ```python
 from myapp.mymodel1 import Model1Base
 from myapp.mymodel2 import Model2Base
 
-# 使用列表
+# Use a list
 target_metadata = [Model1Base.metadata, Model2Base.metadata]
+
 ```
 
 ---
 
-## ⚙️ 高级配置
+## ⚙️ Advanced Configuration
 
-### 使用 pyproject.toml 配置
+### Using pyproject.toml Configuration
 
-从 Alembic 1.16.0 开始，可以使用 `pyproject.toml` 进行配置：
+Starting from Alembic 1.16.0, you can use `pyproject.toml` for configuration:
 
 ```bash
-# 使用 pyproject 模板初始化
+# Initialize using pyproject template
 uv run alembic init --template pyproject migrations
+
 ```
 
-**pyproject.toml 配置示例**：
+**pyproject.toml Config Example**:
 
 ```toml
 [tool.alembic]
-# 迁移脚本路径
+# Script location
 script_location = "%(here)s/migrations"
 
-# 文件命名模板
+# File naming template
 # file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
 
-# 额外的 sys.path
+# Additional sys.path
 prepend_sys_path = [
     "."
 ]
 
-# 时区
+# Timezone
 # timezone = UTC
 
-# 版本文件位置
+# Version locations
 # version_locations = [
 #     "%(here)s/migrations/versions",
 # ]
 
-# 递归搜索版本文件
+# Recursive version locations
 # recursive_version_locations = false
 
-# 输出编码
+# Output encoding
 output_encoding = "utf-8"
+
 ```
 
 ---
 
-### 配置代码格式化
+### Configuring Code Formatting
 
-**使用 Black 格式化生成的迁移文件**：
+**Format Generated Migrations with Black**:
 
-在 `alembic.ini` 中配置：
+Configure in `alembic.ini`:
 
 ```ini
 [post_write_hooks]
-# 格式化代码
+# Format code
 hooks = black
 
 black.type = console_scripts
 black.entrypoint = black
 black.options = -l 79 REVISION_SCRIPT_FILENAME
+
 ```
 
-在 `pyproject.toml` 中配置：
+Or in `pyproject.toml`:
 
 ```toml
 [[tool.alembic.post_write_hooks]]
@@ -813,9 +868,10 @@ name = "black"
 type = "console_scripts"
 entrypoint = "black"
 options = "-l 79 REVISION_SCRIPT_FILENAME"
+
 ```
 
-**使用多个工具（Black + zimports）**：
+**Using Multiple Tools (Black + zimports)**:
 
 ```ini
 [post_write_hooks]
@@ -828,9 +884,10 @@ black.options = -l 79 REVISION_SCRIPT_FILENAME
 zimports.type = console_scripts
 zimports.entrypoint = zimports
 zimports.options = --style google REVISION_SCRIPT_FILENAME
+
 ```
 
-**使用 pre-commit**：
+**Using pre-commit**:
 
 ```ini
 [post_write_hooks]
@@ -840,13 +897,14 @@ pre-commit.type = console_scripts
 pre-commit.entrypoint = pre-commit
 pre-commit.options = run --files REVISION_SCRIPT_FILENAME
 pre-commit.cwd = %(here)s
+
 ```
 
 ---
 
-### 自定义后处理钩子
+### Custom Post-Write Hooks
 
-编写 Python 函数作为钩子：
+Write a Python function as a hook:
 
 ```python
 from alembic.script import write_hooks
@@ -866,9 +924,10 @@ def convert_spaces_to_tabs(filename, options):
             )
     with open(filename, "w") as to_write:
         to_write.write("".join(lines))
+
 ```
 
-在 `alembic.ini` 中使用：
+Use in `alembic.ini`:
 
 ```ini
 [alembic]
@@ -877,167 +936,183 @@ revision_environment = true
 [post_write_hooks]
 hooks = spaces_to_tabs
 spaces_to_tabs.type = spaces_to_tabs
+
 ```
 
 ---
 
-### 配置迁移文件命名
+### Configure Migration File Naming
 
-在 `alembic.ini` 中自定义文件命名模板：
+Customize file naming template in `alembic.ini`:
 
 ```ini
-# 使用日期时间前缀
+# Use datetime prefix
 file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
 
-# 或使用日期子目录组织（需要 recursive_version_locations = true）
+# Or organize by date subdirectory (requires recursive_version_locations = true)
 file_template = %%(year)d/%%(month).2d/%%(day).2d_%%(hour).2d%%(minute).2d_%%(second).2d_%%(rev)s_%%(slug)s
+
 ```
 
-**占位符说明**：
+**Placeholders**:
 
-| 占位符 | 说明 | 示例 |
-|--------|------|------|
-| `%(year)d` | 4 位年份 | 2024 |
-| `%(month).2d` | 2 位月份 | 01 |
-| `%(day).2d` | 2 位日期 | 15 |
-| `%(hour).2d` | 2 位小时 | 13 |
-| `%(minute).2d` | 2 位分钟 | 45 |
-| `%(rev)s` | 修订 ID | 1975ea83b712 |
-| `%(slug)s` | 消息的简短版本 | create_account_table |
-| `%(table)s` | 表名（如果自动生成） | todos |
+| Placeholder | Description | Example |
+| --- | --- | --- |
+| `%(year)d` | 4-digit year | 2024 |
+| `%(month).2d` | 2-digit month | 01 |
+| `%(day).2d` | 2-digit day | 15 |
+| `%(hour).2d` | 2-digit hour | 13 |
+| `%(minute).2d` | 2-digit minute | 45 |
+| `%(rev)s` | Revision ID | 1975ea83b712 |
+| `%(slug)s` | Slugified message | create_account_table |
+| `%(table)s` | Table name (if autogenerated) | todos |
 
 ---
 
-## ❓ 常见问题
+## ❓ FAQ
 
-### Q1: 运行迁移时报错 "No module named 'app'"
+### Q1: Error "No module named 'app'" when running migrations
 
-**原因**：不在正确的目录下运行命令
+**Cause**: Running commands from the wrong directory.
 
-**解决方案**：确保在 `backend` 目录下运行
+**Solution**: Ensure you run it from the `backend` directory.
 
 ```bash
 cd backend
 uv run alembic upgrade head
+
 ```
 
-**或**：检查 `migrations/env.py` 中的 `sys.path` 配置是否正确
+**Or**: Check if `sys.path` configuration in `migrations/env.py` is correct.
 
 ---
 
-### Q2: 生成的迁移文件是空的
+### Q2: Generated migration file is empty
 
-**原因**：Alembic 没有检测到模型变化
+**Cause**: Alembic didn't detect model changes.
 
-**解决方案**：
-1. ✅ 确认 `env.py` 导入了所有模型
-2. ✅ 确认 `target_metadata = SQLModel.metadata`
-3. ✅ 确认数据库连接正确
-4. ✅ 如果表已存在且没有变化，Alembic 不会生成迁移
+**Solution**:
+
+1. ✅ Confirm `env.py` imports all models.
+2. ✅ Confirm `target_metadata = SQLModel.metadata`.
+3. ✅ Confirm database connection is correct.
+4. ✅ If the table already exists and matches the model, Alembic generates nothing.
 
 ---
 
-### Q3: 数据库连接失败
+### Q3: Database connection failed
 
-**检查清单**：
-- ✅ Docker 容器运行中：`docker-compose ps`
-- ✅ 端口正确：`54321`
-- ✅ 连接字符串：`postgresql+asyncpg://postgres:password@localhost:54321/electric`
-- ✅ 数据库名称：`electric`
+**Checklist**:
 
-**测试连接**：
+* ✅ Docker container running: `docker-compose ps`
+* ✅ Port correct: `54321`
+* ✅ Connection string: `postgresql+asyncpg://postgres:password@localhost:54321/electric`
+* ✅ Database name: `electric`
+
+**Test Connection**:
 
 ```bash
 docker exec -it electric_expo_db_quickstart-postgres-1 psql -U postgres -d electric -c "SELECT 1"
+
 ```
 
 ---
 
-### Q4: 迁移应用失败，如何回滚？
+### Q4: Migration failed, how to rollback?
 
 ```bash
-# 查看当前版本
+# View current version
 uv run alembic current
 
-# 回滚到上一个版本
+# Rollback to previous version
 uv run alembic downgrade -1
 
-# 如果需要，删除失败的迁移文件
+# If needed, delete the failed migration file
 rm migrations/versions/xxxx_failed_migration.py
+
 ```
 
 ---
 
-### Q5: 如何在生产环境应用迁移？
+### Q5: How to apply migrations in production?
 
-⚠️ **生产环境最佳实践**：
+⚠️ **Production Best Practices**:
 
-1. **备份数据库**（必须！）
+1. **Backup Database** (Mandatory!)
+
 ```bash
 pg_dump -U postgres -d electric > backup_$(date +%Y%m%d).sql
+
 ```
 
-2. **在测试环境先测试迁移**
+2. **Test migration in staging environment first**
+3. **Inspect Migration Content**
 
-3. **检查迁移内容**
 ```bash
 uv run alembic upgrade head --sql > migration.sql
-# 审查 migration.sql 文件
+# Review migration.sql file
+
 ```
 
-4. **应用迁移**
+4. **Apply Migration**
+
 ```bash
 uv run alembic upgrade head
+
 ```
 
-5. **验证数据**
+5. **Verify Data**
 
 ---
 
-### Q6: Alembic 检测到了不应检测的变化
+### Q6: Alembic detected changes it shouldn't have
 
-**问题**：autogenerate 生成了一些不需要的迁移
+**Issue**: Autogenerate created some unwanted migrations.
 
-**解决方案**：
+**Solution**:
 
-1. **使用 `include_object` 过滤**
+1. **Use `include_object` filter**
+
 ```python
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == "table":
-        # 只包含特定表
+        # Only include specific tables
         return name == "todos"
     return True
+
 ```
 
-2. **使用 `include_name` 过滤**
+2. **Use `include_name` filter**
+
 ```python
 def include_name(name, type_, parent_names):
     if type_ == "column":
-        # 排除特定列
+        # Exclude specific column
         return name != "temp_column"
     return True
+
 ```
 
 ---
 
-### Q7: 如何处理数据迁移？
+### Q7: How to handle data migrations?
 
-**场景**：需要在迁移中修改数据，而不是修改表结构
+**Scenario**: Need to modify data in a migration, not just table structure.
 
-**解决方案**：使用批量操作
+**Solution**: Use bulk operations.
 
 ```python
 from sqlalchemy import table, column
 
 def upgrade() -> None:
-    # 定义临时表结构
+    # Define temp table structure
     todos = table('todos',
         column('id', sa.Integer()),
         column('text', sa.String()),
         column('completed', sa.Boolean())
     )
 
-    # 批量更新
+    # Bulk update
     connection.execute(
         todos.update()
         .where(todos.c.completed == None)
@@ -1045,7 +1120,7 @@ def upgrade() -> None:
     )
 
 def downgrade() -> None:
-    # 回滚数据变更
+    # Rollback data change
     todos = table('todos',
         column('id', sa.Integer()),
         column('completed', sa.Boolean())
@@ -1056,120 +1131,133 @@ def downgrade() -> None:
         .where(todos.c.completed == False)
         .values(completed=None)
     )
+
 ```
 
 ---
 
-## 💡 最佳实践
+## 💡 Best Practices
 
-### 1. ✅ 始终检查自动生成的迁移
+### 1. ✅ Always Review Auto-generated Migrations
 
-根据 Alembic 官方文档：
+According to Alembic Official Docs:
 
 > "It is always necessary to manually review and correct the candidate migrations that autogenerate produces."
 
-自动生成不是完美的，务必手动审查！
+Autogenerate is not perfect; always review manually!
 
 ---
 
-### 2. ✅ 使用描述性的迁移消息
+### 2. ✅ Use Descriptive Migration Messages
 
-**好的示例**：
+**Good Example**:
+
 ```bash
 uv run alembic revision --autogenerate -m "Add priority and due_date to todos"
+
 ```
 
-**不好的示例**：
+**Bad Example**:
+
 ```bash
 uv run alembic revision --autogenerate -m "update"
 uv run alembic revision --autogenerate -m "fix"
+
 ```
 
 ---
 
-### 3. ✅ 命名约束
+### 3. ✅ Name Your Constraints
 
-始终给约束命名，便于自动生成检测：
+Always name constraints to allow Autogenerate to detect them:
 
 ```python
-# ❌ 不好：匿名约束
+# ❌ Bad: Anonymous Constraint
 UniqueConstraint('col1', 'col2')
 
-# ✅ 好：命名约束
+# ✅ Good: Named Constraint
 UniqueConstraint('col1', 'col2', name="uq_col1_col2")
 
-# ✅ 好：命名外键
+# ✅ Good: Named Foreign Key
 ForeignKeyConstraint(['user_id'], ['users.id'], name="fk_todos_user_id")
+
 ```
 
 ---
 
-### 4. ✅ 在应用迁移前备份数据库
+### 4. ✅ Backup Database Before Applying Migrations
 
-特别是在生产环境，始终先备份！
+Especially in production, always backup first!
 
 ---
 
-### 5. ✅ 测试迁移的 upgrade 和 downgrade
+### 5. ✅ Test Upgrade and Downgrade
 
-确保可以回滚：
+Ensure rollback is possible:
 
 ```bash
-# 应用迁移
+# Apply migration
 uv run alembic upgrade head
 
-# 测试回滚
+# Test rollback
 uv run alembic downgrade -1
 
-# 重新应用
+# Re-apply
 uv run alembic upgrade head
+
 ```
 
 ---
 
-### 6. ✅ 提交迁移文件到版本控制
+### 6. ✅ Commit Migration Files to Version Control
 
 ```bash
 git add migrations/versions/
 git commit -m "Add migration: Add priority field to todos"
+
 ```
 
 ---
 
-### 7. ✅ 一次只做一件事
+### 7. ✅ Do One Thing at a Time
 
-不要在一个迁移中混合多个不相关的变更。每个迁移应该是一个独立的、可回滚的单元。
+Don't mix unrelated changes in one migration. Each migration should be an independent, reversible unit.
 
-**❌ 不好**：
+**❌ Bad**:
+
 ```bash
 uv run alembic revision --autogenerate -m "Add priority field and rename status column"
+
 ```
 
-**✅ 好**：
+**✅ Good**:
+
 ```bash
 uv run alembic revision --autogenerate -m "Add priority field to todos"
 uv run alembic revision --autogenerate -m "Rename status to completed"
+
 ```
 
 ---
 
-### 8. ✅ 使用相对版本标识
+### 8. ✅ Use Relative Revision Identifiers
 
-便于在脚本中引用：
+Easier to reference in scripts:
 
 ```bash
-# 应用下一个迁移
+# Apply next migration
 uv run alembic upgrade +1
 
-# 回滚两个迁移
+# Rollback two migrations
 uv run alembic downgrade -2
+
 ```
 
 ---
 
-### 9. ✅ 配置代码格式化
+### 9. ✅ Configure Code Formatting
 
-保持迁移文件风格一致：
+Keep migration file style consistent:
 
 ```ini
 [post_write_hooks]
@@ -1177,102 +1265,112 @@ hooks = black
 black.type = console_scripts
 black.entrypoint = black
 black.options = -l 79 REVISION_SCRIPT_FILENAME
+
 ```
 
 ---
 
-### 10. ✅ 使用 alembic check
+### 10. ✅ Use alembic check
 
-在 CI/CD 中集成，确保迁移同步：
+Integrate into CI/CD to ensure migrations are in sync:
 
 ```yaml
 # .github/workflows/ci.yml
 - name: Check for pending migrations
   run: uv run alembic check
+
 ```
 
 ---
 
-### 11. ✅ 定期清理旧迁移
+### 11. ✅ Regularly Clean Up Old Migrations
 
-避免版本文件过多影响启动性能。可以考虑：
-- 使用日期子目录组织迁移
-- 定期合并旧的迁移（需要谨慎）
+Avoid having too many version files affecting startup performance. Consider:
 
----
-
-## 📚 常用命令速查
-
-### 迁移生成
-
-```bash
-uv run alembic revision --autogenerate -m "描述"  # 自动生成迁移
-uv run alembic revision -m "描述"                # 手动创建空迁移
-uv run alembic list_templates                     # 查看可用模板
-```
-
-### 迁移应用
-
-```bash
-uv run alembic upgrade head                      # 应用所有迁移
-uv run alembic upgrade +1                        # 应用下一个迁移
-uv run alembic upgrade <revision>                # 应用到特定版本
-```
-
-### 迁移回滚
-
-```bash
-uv run alembic downgrade -1                      # 回滚一个版本
-uv run alembic downgrade base                    # 回滚所有迁移
-uv run alembic downgrade <revision>              # 回滚到特定版本
-```
-
-### 查看状态
-
-```bash
-uv run alembic current                           # 查看当前版本
-uv run alembic history                           # 查看迁移历史
-uv run alembic history --verbose                 # 查看详细历史
-uv run alembic history -r1975ea:ae1027          # 查看历史范围
-uv run alembic heads                             # 查看所有头版本
-uv run alembic branches                           # 查看所有分支
-```
-
-### 其他
-
-```bash
-uv run alembic upgrade head --sql                # 生成 SQL 而不执行
-uv run alembic check                             # 检查是否有未应用的迁移
-```
+* Organizing migrations by date subdirectories.
+* Periodically squashing old migrations (proceed with caution).
 
 ---
 
-## 🔗 相关资源
+## 📚 Command Cheatsheet
 
-### 官方文档
-- **[Alembic 官方文档](https://alembic.sqlalchemy.org/)** - 完整的 Alembic 文档
-- **[Alembic 自动生成](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)** - 自动生成详细说明
-- **[SQLAlchemy 文档](https://docs.sqlalchemy.org/)** - SQLAlchemy ORM 文档
-- **[SQLModel 文档](https://sqlmodel.tiangolo.com/)** - SQLModel ORM 文档
-- **[FastAPI 文档](https://fastapi.tiangolo.com/)** - FastAPI 框架文档
+### Generating Migrations
 
-### 项目相关
-- **[本项目的 backend/app/models.py](../app/models.py)** - 模型定义
-- **[本项目的 backend/migrations/](../migrations/)** - 迁移环境
+```bash
+uv run alembic revision --autogenerate -m "Desc"  # Auto-generate migration
+uv run alembic revision -m "Desc"                 # Manually create empty migration
+uv run alembic list_templates                     # List available templates
+
+```
+
+### Applying Migrations
+
+```bash
+uv run alembic upgrade head                       # Apply all migrations
+uv run alembic upgrade +1                         # Apply next migration
+uv run alembic upgrade <revision>                 # Apply to specific version
+
+```
+
+### Rolling Back Migrations
+
+```bash
+uv run alembic downgrade -1                       # Rollback one version
+uv run alembic downgrade base                     # Rollback all migrations
+uv run alembic downgrade <revision>               # Rollback to specific version
+
+```
+
+### Viewing Status
+
+```bash
+uv run alembic current                            # View current version
+uv run alembic history                            # View migration history
+uv run alembic history --verbose                  # View detailed history
+uv run alembic history -r1975ea:ae1027            # View history range
+uv run alembic heads                              # View all head revisions
+uv run alembic branches                           # View all branches
+
+```
+
+### Others
+
+```bash
+uv run alembic upgrade head --sql                 # Generate SQL without executing
+uv run alembic check                              # Check for unapplied migrations
+
+```
 
 ---
 
-## 🛠️ 技术栈
+## 🔗 Related Resources
 
-- **FastAPI** - 现代 Python Web 框架
-- **SQLModel** - SQL 数据库的 Python ORM
-- **Alembic** - 数据库迁移工具
-- **PostgreSQL** - 关系型数据库
-- **Electric SQL** - 实时数据同步
-- **asyncpg** - 异步 PostgreSQL 驱动
+### Official Documentation
+
+* **[Alembic Official Docs](https://alembic.sqlalchemy.org/)** - Complete Alembic documentation
+* **[Alembic Autogenerate](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)** - Autogenerate details
+* **[SQLAlchemy Docs](https://docs.sqlalchemy.org/)** - SQLAlchemy ORM documentation
+* **[SQLModel Docs](https://sqlmodel.tiangolo.com/)** - SQLModel ORM documentation
+* **[FastAPI Docs](https://fastapi.tiangolo.com/)** - FastAPI framework documentation
+
+### Project Related
+
+* **[This project's backend/app/models.py](https://www.google.com/search?q=../app/models.py)** - Model definitions
+* **[This project's backend/migrations/](https://www.google.com/search?q=../migrations/)** - Migration environment
 
 ---
 
-**祝您使用愉快！** 🎉
+## 🛠️ Tech Stack
 
-如有问题，请查看 [常见问题](#常见问题) 或参考 [Alembic 官方文档](https://alembic.sqlalchemy.org/)。
+* **FastAPI** - Modern Python Web Framework
+* **SQLModel** - Python ORM for SQL Databases
+* **Alembic** - Database Migration Tool
+* **PostgreSQL** - Relational Database
+* **Electric SQL** - Real-time Data Sync
+* **asyncpg** - Async PostgreSQL Driver
+
+---
+
+**Happy Coding!** 🎉
+
+If you have questions, check the [FAQ](https://www.google.com/search?q=%23faq) or refer to the [Alembic Official Docs](https://alembic.sqlalchemy.org/).
