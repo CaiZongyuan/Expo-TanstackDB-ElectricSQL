@@ -155,6 +155,20 @@ Additional context.
 - **Glassmorphism** with `expo-glass-effect`
 - Class names work via Uniwind runtime (see `.vscode/settings.json`)
 
+**Uniwind FlatList Gotcha**: When using FlatList with Uniwind, ensure proper layout structure:
+- Separate fixed-height elements (headers, inputs) into a container WITHOUT `flex: 1`
+- Place FlatList in a separate container WITH `flex: 1` to occupy remaining space
+- Use native `style` prop for FlatList's `flex` and `contentContainerStyle` (not `className`)
+- Example:
+  ```tsx
+  <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+    {/* Fixed height elements - no flex */}
+  </View>
+  <View style={{ flex: 1, paddingHorizontal: 20 }}>
+    <FlatList style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }} />
+  </View>
+  ```
+
 ### Provider Stack
 Root layout (`src/app/_layout.tsx`):
 1. `GestureHandlerRootView` - react-native-gesture-handler

@@ -10,51 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const theme = {
-  colors: {
-    background: "#FFFFFF",
-    content1: "#FFFFFF", // Card background
-    content2: "#F4F4F5", // Input background / Hover
-    primary: "#006FEE",
-    primaryForeground: "#FFFFFF",
-    danger: "#F31260",
-    dangerForeground: "#FFFFFF",
-    default: "#3F3F46", // Text color
-    default300: "#D4D4D8", // Border/Disabled
-    default500: "#71717A", // Subtext
-    overlay: "rgba(0, 0, 0, 0.4)",
-  },
-  radius: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    full: 9999,
-  },
-  shadow: {
-    sm: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    md: {
-      shadowColor: "#006FEE",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 12,
-      elevation: 4,
-    },
-  },
-};
 
 // --- Electric DB Setup ---
 const todoCollection = createCollection(
@@ -90,26 +51,16 @@ const todoCollection = createCollection(
   })
 );
 
-const HeroButton = ({ onPress, title, color = "primary", style }: any) => {
+const HeroButton = ({ onPress, title, color = "primary" }: any) => {
   const isPrimary = color === "primary";
-  const bg = isPrimary ? theme.colors.primary : theme.colors.danger;
-  const fg = isPrimary
-    ? theme.colors.primaryForeground
-    : theme.colors.dangerForeground;
-  const shadow = isPrimary ? theme.shadow.md : {};
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        { backgroundColor: bg },
-        shadow,
-        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-        style,
-      ]}
+      className={`h-14 px-6 rounded-2xl justify-center items-center ${isPrimary ? "bg-[#006FEE] shadow-md" : "bg-[#F31260]"}`}
+      style={({ pressed }) => pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }}
     >
-      <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+      <Text className="text-white font-semibold text-base">{title}</Text>
     </Pressable>
   );
 };
@@ -118,13 +69,10 @@ const HeroCheckbox = ({ checked, onPress }: any) => {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.checkbox,
-        checked ? styles.checkboxChecked : styles.checkboxUnchecked,
-        pressed && { opacity: 0.7 },
-      ]}
+      className={`w-6 h-6 rounded-lg border-2 justify-center items-center mr-3 ${checked ? "border-[#006FEE] bg-[#006FEE]" : "border-[#D4D4D8] bg-transparent"}`}
+      style={({ pressed }) => pressed && { opacity: 0.7 }}
     >
-      {checked && <Text style={styles.checkmark}>✓</Text>}
+      {checked && <Text className="text-white text-sm font-bold">✓</Text>}
     </Pressable>
   );
 };
@@ -151,29 +99,24 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <View style={styles.contentContainer}>
-          <Text style={styles.headerTitle}>Tasks</Text>
-          <Text style={styles.headerSubtitle}>Manage your daily goals</Text>
+        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+          <Text className="text-[32px] font-extrabold text-black mb-1 -tracking-tight">Tasks</Text>
+          <Text className="text-base text-[#71717A] mb-6">Manage your daily goals</Text>
 
           {/* Input Section */}
-          <View style={styles.inputWrapper}>
-            <View
-              style={[
-                styles.inputContainer,
-                isFocused && styles.inputContainerFocused,
-              ]}
-            >
+          <View className="flex-row items-center mb-6 gap-3">
+            <View className={`flex-1 rounded-2xl px-4 h-14 justify-center border-2 ${isFocused ? "bg-white border-[#006FEE]" : "bg-[#F4F4F5] border-transparent"}`}>
               <TextInput
-                style={styles.input}
+                className="text-base text-[#3F3F46] h-full"
                 value={newTodoText}
                 onChangeText={setNewTodoText}
                 placeholder="What needs to be done?"
-                placeholderTextColor={theme.colors.default500}
+                placeholderTextColor="#71717A"
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
               />
@@ -181,19 +124,21 @@ export default function HomeScreen() {
             <HeroButton
               title="Add"
               onPress={handleAddTodo}
-              style={styles.addButton}
             />
           </View>
+        </View>
 
-          {/* Todo List */}
+        {/* Todo List */}
+        <View style={{ flex: 1, paddingHorizontal: 20 }}>
           <FlatList
             data={todos}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContent}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
-              <Pressable style={styles.card}>
-                <View style={styles.cardRow}>
+              <Pressable className="bg-white rounded-2xl p-4 border border-[#F4F4F5] shadow-sm mb-3">
+                <View className="flex-row items-center">
                   <HeroCheckbox
                     checked={item.completed}
                     onPress={() => {
@@ -203,12 +148,9 @@ export default function HomeScreen() {
                     }}
                   />
 
-                  <View style={styles.textWrapper}>
+                  <View className="flex-1">
                     <Text
-                      style={[
-                        styles.todoText,
-                        item.completed && styles.todoTextCompleted,
-                      ]}
+                      className={`text-base font-medium ${item.completed ? "text-[#D4D4D8] line-through" : "text-[#3F3F46]"}`}
                       numberOfLines={2}
                     >
                       {item.text}
@@ -217,17 +159,17 @@ export default function HomeScreen() {
 
                   <TouchableOpacity
                     onPress={() => todoCollection.delete(item.id)}
-                    style={styles.deleteButton}
+                    className="p-2 bg-[#F4F4F5] rounded-full ml-2"
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text style={styles.deleteIcon}>✕</Text>
+                    <Text className="text-[#71717A] text-xs font-bold">✕</Text>
                   </TouchableOpacity>
                 </View>
               </Pressable>
             )}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>
+              <View className="items-center justify-center pt-10 opacity-50">
+                <Text className="text-base text-[#71717A]">
                   No tasks yet. Add one above!
                 </Text>
               </View>
@@ -239,144 +181,3 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  contentContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#000",
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: theme.colors.default500,
-    marginBottom: 24,
-  },
-  // Input Styles
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 24,
-    gap: 12,
-  },
-  inputContainer: {
-    flex: 1,
-    backgroundColor: theme.colors.content2,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: 16,
-    height: 56, // Tall input for modern feel
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  inputContainerFocused: {
-    backgroundColor: theme.colors.background,
-    borderColor: theme.colors.primary,
-  },
-  input: {
-    fontSize: 16,
-    color: theme.colors.default,
-    height: "100%",
-  },
-  addButton: {
-    height: 56,
-    paddingHorizontal: 24,
-    borderRadius: theme.radius.lg,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFF",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  button: {
-    // Base button styles handled in component
-  },
-  // List Styles
-  listContent: {
-    paddingBottom: 40,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: theme.colors.content1,
-    borderRadius: theme.radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.content2,
-    // Soft shadow
-    ...theme.shadow.sm,
-  },
-  cardRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  // Checkbox
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8, // Rounded square
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  checkboxUnchecked: {
-    borderColor: theme.colors.default300,
-    backgroundColor: "transparent",
-  },
-  checkboxChecked: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
-  },
-  checkmark: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  // Text
-  textWrapper: {
-    flex: 1,
-  },
-  todoText: {
-    fontSize: 16,
-    color: theme.colors.default,
-    fontWeight: "500",
-  },
-  todoTextCompleted: {
-    color: theme.colors.default300,
-    textDecorationLine: "line-through",
-  },
-  // Delete
-  deleteButton: {
-    padding: 8,
-    backgroundColor: theme.colors.content2,
-    borderRadius: theme.radius.full,
-    marginLeft: 8,
-  },
-  deleteIcon: {
-    color: theme.colors.default500,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 40,
-    opacity: 0.5,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: theme.colors.default500,
-  },
-});
