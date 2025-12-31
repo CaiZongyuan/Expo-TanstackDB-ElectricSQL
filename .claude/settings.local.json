@@ -15,7 +15,8 @@
       "Bash(dir:*)",
       "Bash(git add:*)",
       "mcp__heroui-native__get_component_info",
-      "mcp__heroui-native__get_component_examples"
+      "mcp__heroui-native__get_component_examples",
+      "Skill(tanstack-db)"
     ]
   },
   "enableAllProjectMcpServers": true,
