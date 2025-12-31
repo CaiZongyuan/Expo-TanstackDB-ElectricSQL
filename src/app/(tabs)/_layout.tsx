@@ -7,9 +7,9 @@ export default function TabLayout() {
         <Label>Diary</Label>
         <Icon sf="book.fill" drawable="custom_android_drawable" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
+      <NativeTabs.Trigger name="todo">
         <Icon sf="gear" drawable="custom_settings_drawable" />
-        <Label>Settings</Label>
+        <Label>Todo</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
