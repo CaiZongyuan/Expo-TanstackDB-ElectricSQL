@@ -39,15 +39,16 @@ const todoCollection = createCollection(
         original: { id },
         changes,
       } = transaction.mutations[0];
-      const { txid } = await apiClient.updateTodo(id, changes);
+      const { txid } = await apiClient.updateTodo(Number(id), changes);
       return { txid };
     },
     onDelete: async ({ transaction }) => {
       const { id } = transaction.mutations[0].original;
-      const { txid } = await apiClient.deleteTodo(id);
+      const { txid } = await apiClient.deleteTodo(Number(id));
       return { txid };
     },
-    getKey: (item) => item.id,
+    // Normalize id to number for consistent key matching
+    getKey: (item) => Number(item.id),
   })
 );
 
@@ -142,7 +143,7 @@ export default function HomeScreen() {
                   <HeroCheckbox
                     checked={item.completed}
                     onPress={() => {
-                      todoCollection.update(item.id, (draft) => {
+                      todoCollection.update(Number(item.id), (draft) => {
                         draft.completed = !draft.completed;
                       });
                     }}
@@ -158,11 +159,11 @@ export default function HomeScreen() {
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => todoCollection.delete(item.id)}
+                    onPress={() => todoCollection.delete(Number(item.id))}
                     className="p-2 bg-[#F4F4F5] rounded-full ml-2"
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                   >
-                    <Text className="text-[#71717A] text-xs font-bold">✕</Text>
+                    <Text className="text-[#71717A] text-sm font-bold">✕</Text>
                   </TouchableOpacity>
                 </View>
               </Pressable>
