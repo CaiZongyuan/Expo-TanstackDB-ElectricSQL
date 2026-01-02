@@ -17,7 +17,10 @@
       "mcp__heroui-native__get_component_info",
       "mcp__heroui-native__get_component_examples",
       "Skill(tanstack-db)",
-      "Skill(tentap-editor)"
+      "Skill(tentap-editor)",
+      "Bash(bunx tsc --noEmit)",
+      "Bash(bun run lint)",
+      "Skill(vercel-ai-sdk)"
     ]
   },
   "enableAllProjectMcpServers": true,

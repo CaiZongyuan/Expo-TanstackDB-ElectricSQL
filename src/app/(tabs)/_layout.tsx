@@ -11,6 +11,10 @@ export default function TabLayout() {
         <Icon sf="gear" drawable="custom_settings_drawable" />
         <Label>Todo</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="chatbot">
+        <Icon sf="person" drawable="custom_settings_drawable" />
+        <Label>Chatbot</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

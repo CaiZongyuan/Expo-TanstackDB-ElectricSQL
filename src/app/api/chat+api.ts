@@ -1,0 +1,41 @@
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { convertToModelMessages, streamText, UIMessage } from "ai";
+
+const glm = createOpenAICompatible({
+  name: "glm",
+  apiKey: process.env.GLM_API_KEY,
+  baseURL:
+    process.env.GLM_API_KEY_BASE_URL ||
+    "https://open.bigmodel.cn/api/coding/paas/v4",
+});
+
+// const agentScopeRuntime = createOpenAI({
+//   baseURL: "http://localhost:8090/compatible-mode/v1",
+//   apiKey: process.env.CUSTOM_OPENAI_API_KEY || "EMPTY",
+// });
+
+export async function POST(req: Request) {
+  const { messages }: { messages: UIMessage[] } = await req.json();
+
+  const result = streamText({
+    // model: agentScopeRuntime("agent-model"),
+    model: glm.chatModel("glm-4.7"),
+    messages: await convertToModelMessages(messages),
+    // providerOptions: {
+    //   glm: {
+    //     enable_thinking: false,
+    //   },
+    // },
+    // Use onChunk callback for debugging, will not consume the stream
+    // onChunk: ({ chunk }) => {
+    //   console.log("Chunk:", chunk);
+    // },
+  });
+
+  return result.toUIMessageStreamResponse({
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "none",
+    },
+  });
+}
