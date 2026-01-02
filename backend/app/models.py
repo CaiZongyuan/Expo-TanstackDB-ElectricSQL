@@ -41,3 +41,41 @@ class TodoCreate(SQLModel):
 class TodoUpdate(SQLModel):
     text: Optional[str] = None
     completed: Optional[bool] = None
+
+
+# === Diary 数据库表定义 ===
+class Diary(SQLModel, table=True):
+    __tablename__ = "diaries"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(nullable=False)
+    content: Optional[str] = Field(default=None, nullable=True)  # 富文本 HTML 内容
+
+    # 使用 sa_column 直接映射 Postgres 的 timestamp with time zone 和 defaultNow()
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),  # 自动更新时间
+            nullable=False,
+        ),
+    )
+
+
+# === Diary Pydantic 模型 (用于请求体校验) ===
+class DiaryCreate(SQLModel):
+    title: str
+    content: Optional[str] = None
+
+
+class DiaryUpdate(SQLModel):
+    title: Optional[str] = None
+    content: Optional[str] = None

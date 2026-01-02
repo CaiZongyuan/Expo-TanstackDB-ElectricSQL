@@ -1,4 +1,4 @@
-import { Todo } from "@/src/db/schema";
+import { Diary, Todo } from "@/src/db/schema";
 import Constants from "expo-constants";
 
 const getHostname = () => {
@@ -72,5 +72,29 @@ export const apiClient = {
 
   async deleteTodo(id: number): Promise<{ success: boolean; txid: number }> {
     return this._request(`/todos/${id}`, { method: `DELETE` });
+  },
+
+  // Diary CRUD operations
+  async createDiary(
+    diaryData: Partial<Omit<Diary, `id` | `created_at` | `updated_at`>>
+  ): Promise<{ diary: Diary; txid: number }> {
+    return this._request(`/diaries`, {
+      method: `POST`,
+      body: JSON.stringify(diaryData),
+    });
+  },
+
+  async updateDiary(
+    id: number,
+    diaryData: Partial<Omit<Diary, `id` | `created_at` | `updated_at`>>
+  ): Promise<{ diary: Diary; txid: number }> {
+    return this._request(`/diaries/${id}`, {
+      method: `PUT`,
+      body: JSON.stringify(diaryData),
+    });
+  },
+
+  async deleteDiary(id: number): Promise<{ success: boolean; txid: number }> {
+    return this._request(`/diaries/${id}`, { method: `DELETE` });
   },
 };

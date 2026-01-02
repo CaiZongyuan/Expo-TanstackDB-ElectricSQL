@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import httpx
 from app.alembic_runner import run_migrations
 from app.db import get_db
-from app.models import Todo, TodoCreate, TodoUpdate
+from app.models import Todo, TodoCreate, TodoUpdate, Diary, DiaryCreate, DiaryUpdate
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -176,6 +176,88 @@ async def delete_todo(id: int, db: AsyncSession = Depends(get_db)):
         )
 
 
+# === Diary CRUD Endpoints ===
+
+# 1. 创建 Diary
+@app.post("/api/diaries", status_code=201)
+async def create_diary(diary_in: DiaryCreate, db: AsyncSession = Depends(get_db)):
+    try:
+        async with db.begin():
+            txid = await get_current_txid(db)
+
+            new_diary = Diary(**diary_in.dict())
+            db.add(new_diary)
+            await db.flush()
+            await db.refresh(new_diary)
+
+            return {"diary": new_diary, "txid": txid}
+
+    except Exception as e:
+        print(f"Error creating diary: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Failed to create diary", "details": str(e)},
+        )
+
+
+# 2. 更新 Diary
+@app.put("/api/diaries/{id}")
+async def update_diary(id: int, diary_in: DiaryUpdate, db: AsyncSession = Depends(get_db)):
+    try:
+        async with db.begin():
+            txid = await get_current_txid(db)
+
+            diary = await db.get(Diary, id)
+            if not diary:
+                raise HTTPException(status_code=404, detail="Diary not found")
+
+            diary_data = diary_in.dict(exclude_unset=True)
+            for key, value in diary_data.items():
+                setattr(diary, key, value)
+
+            diary.updated_at = datetime.now(timezone.utc)
+
+            db.add(diary)
+            await db.flush()
+            await db.refresh(diary)
+
+            return {"diary": diary, "txid": txid}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating diary: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Failed to update diary", "details": str(e)},
+        )
+
+
+# 3. 删除 Diary
+@app.delete("/api/diaries/{id}")
+async def delete_diary(id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        async with db.begin():
+            txid = await get_current_txid(db)
+
+            diary = await db.get(Diary, id)
+            if not diary:
+                raise HTTPException(status_code=404, detail="Diary not found")
+
+            await db.delete(diary)
+
+            return {"success": True, "txid": txid}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting diary: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Failed to delete diary", "details": str(e)},
+        )
+
+
 # 4. Electric Shape 代理 (核心功能)
 @app.get("/api/todos")
 async def proxy_electric_shape(request: Request):
@@ -215,6 +297,62 @@ async def proxy_electric_shape(request: Request):
 
             # 对于所有状态码（包括 409 Conflict），都原样传递响应给客户端
             # 客户端需要根据状态码来处理 handle 过期等情况
+            async def stream_generator():
+                try:
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+                except Exception as e:
+                    print(f"Proxy stream error: {e}")
+                    raise
+                finally:
+                    await response.aclose()
+                    await client.aclose()
+
+            return StreamingResponse(
+                stream_generator(), status_code=response.status_code, headers=headers
+            )
+
+        except Exception as e:
+            await client.aclose()
+            raise
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Proxy error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Internal server error", "details": str(e)},
+        )
+
+
+# 5. Electric Shape 代理 for Diaries
+@app.get("/api/diaries")
+async def proxy_electric_shape_diaries(request: Request):
+    """代理 Electric Shape 请求 for Diaries table"""
+    electric_shape_url = f"{ELECTRIC_URL}/v1/shape"
+
+    # 构造查询参数
+    params = {}
+    for key, value in request.query_params.items():
+        if key in ELECTRIC_PROTOCOL_QUERY_PARAMS:
+            params[key] = value
+
+    # 强制指定 table
+    params["table"] = "diaries"
+
+    try:
+        client = httpx.AsyncClient(timeout=httpx.Timeout(300.0))
+
+        try:
+            req = client.build_request("GET", electric_shape_url, params=params)
+            response = await client.send(req, stream=True)
+
+            headers = {}
+            for key, value in response.headers.items():
+                if key.lower() not in ["content-encoding", "content-length"]:
+                    headers[key] = value
+
             async def stream_generator():
                 try:
                     async for chunk in response.aiter_bytes():

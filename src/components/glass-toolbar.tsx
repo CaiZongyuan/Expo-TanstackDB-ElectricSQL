@@ -80,7 +80,7 @@ export const GlassToolbar = ({ editor }: GlassToolbarProps) => {
       style={[
         styles.toolbarWrapper,
         {
-          bottom: keyboardHeight - 10,
+          bottom: keyboardHeight - 40,
           transform: [{ translateY: slideAnim }],
         },
       ]}

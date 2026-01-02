@@ -14,6 +14,13 @@ export default function Layout() {
           ),
         }}
       />
+      <Stack.Screen
+        name="[id]"
+        options={{
+          headerTitle: "",
+          headerBackTitle: "Diary",
+        }}
+      />
     </Stack>
   );
 }
