@@ -65,11 +65,21 @@ export default function Diary() {
   // Query diaries
   const { data: diaries } = useLiveQuery((q) => q.from({ diaryCollection }));
 
-  // Find current diary
+  // Find current diary by ID
   const currentDiary = diaries?.find((d) => d.id === Number(diaryIdFromParams));
 
+  // For new diaries that haven't synced yet, find by most recent
+  const latestDiary =
+    isNewDiary || !currentDiary
+      ? diaries?.sort((a, b) => {
+          const bTime = new Date(b.updated_at).getTime();
+          const aTime = new Date(a.updated_at).getTime();
+          return bTime - aTime;
+        })[0]
+      : currentDiary;
+
   // Local state
-  const [title, setTitle] = useState(currentDiary?.title || "");
+  const [title, setTitle] = useState(latestDiary?.title || "");
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -77,7 +87,7 @@ export default function Diary() {
   const editor = useEditorBridge({
     autofocus: true,
     avoidIosKeyboard: true,
-    initialContent: currentDiary?.content || EMPTY_HTML,
+    initialContent: latestDiary?.content || EMPTY_HTML,
     bridgeExtensions: [...TenTapStartKit],
   });
 
@@ -86,22 +96,15 @@ export default function Diary() {
 
   // Update title when diary data changes
   useEffect(() => {
-    if (currentDiary) {
-      setTitle(currentDiary.title);
+    if (latestDiary) {
+      setTitle(latestDiary.title);
     }
-  }, [currentDiary]);
+  }, [latestDiary]);
 
   // Debounced save function
   const debouncedSave = useCallback(
     (id: number, newTitle: string, newContent: string) => {
       if (isSaving) return;
-
-      // Check if diary exists in collection before updating
-      const diaryExists = diaries?.some(d => d.id === id);
-      if (!diaryExists) {
-        console.warn("Diary not yet synced to collection, skipping save");
-        return;
-      }
 
       setIsSaving(true);
 
@@ -117,41 +120,39 @@ export default function Diary() {
         setIsSaving(false);
       }
     },
-    [isSaving, diaries]
+    [isSaving]
   );
 
   // Auto-save content changes
   useEffect(() => {
     if (
-      !isNewDiary &&
-      currentDiary &&
+      latestDiary &&
       editorContent !== undefined &&
-      editorContent !== currentDiary.content
+      editorContent !== latestDiary.content
     ) {
       setIsDirty(true);
       const timeoutId = setTimeout(() => {
-        debouncedSave(currentDiary.id, title, editorContent);
+        debouncedSave(latestDiary.id, title, editorContent);
       }, 1000);
       return () => clearTimeout(timeoutId);
     }
-  }, [editorContent, currentDiary, isNewDiary, title, debouncedSave]);
+  }, [editorContent, latestDiary, title, debouncedSave]);
 
   // Auto-save title changes
   useEffect(() => {
     if (
-      !isNewDiary &&
-      currentDiary &&
-      title !== currentDiary.title &&
+      latestDiary &&
+      title !== latestDiary.title &&
       title !== ""
     ) {
       setIsDirty(true);
       const timeoutId = setTimeout(() => {
-        const contentToSave = editorContent || currentDiary.content || EMPTY_HTML;
-        debouncedSave(currentDiary.id, title, contentToSave);
+        const contentToSave = editorContent || latestDiary.content || EMPTY_HTML;
+        debouncedSave(latestDiary.id, title, contentToSave);
       }, 1000);
       return () => clearTimeout(timeoutId);
     }
-  }, [title, currentDiary, isNewDiary, editorContent, debouncedSave]);
+  }, [title, latestDiary, editorContent, debouncedSave]);
 
   return (
     <SafeAreaView
@@ -171,9 +172,9 @@ export default function Diary() {
               onChangeText={setTitle}
               onEndEditing={() => {
                 // Trigger immediate save when user finishes editing title
-                if (currentDiary && title !== currentDiary.title) {
-                  const contentToSave = editorContent || currentDiary.content || EMPTY_HTML;
-                  debouncedSave(currentDiary.id, title, contentToSave);
+                if (latestDiary && title !== latestDiary.title) {
+                  const contentToSave = editorContent || latestDiary.content || EMPTY_HTML;
+                  debouncedSave(latestDiary.id, title, contentToSave);
                 }
               }}
               placeholder="Diary Title..."
