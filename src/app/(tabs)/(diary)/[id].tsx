@@ -1,6 +1,7 @@
 import { GlassToolbar } from "@/src/components/glass-toolbar";
 import { selectDiarySchema } from "@/src/db/schema";
 import { apiClient, hostname } from "@/src/utils/api-client";
+import { generateAPIUrl } from "@/src/utils/generateAPIUrl";
 import {
   RichText,
   TenTapStartKit,
@@ -13,13 +14,20 @@ import { parseISO } from "date-fns";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { fetch as expoFetch } from "expo/fetch";
+import { marked } from "marked";
 
 // --- Electric DB Setup ---
 const diaryCollection = createCollection(
@@ -82,6 +90,24 @@ export default function Diary() {
   const [title, setTitle] = useState(latestDiary?.title || "");
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // AI-related state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isAIGenerating, setIsAIGenerating] = useState(false);
+  const [showAISection, setShowAISection] = useState(false);
+  const [originalContent, setOriginalContent] = useState<string>("");
+
+  // Setup useChat for AI streaming
+  const { messages, sendMessage, stop } = useChat({
+    transport: new DefaultChatTransport({
+      fetch: expoFetch as unknown as typeof globalThis.fetch,
+      api: generateAPIUrl("/api/chat"),
+    }),
+    onError: (error) => {
+      console.error("AI Error:", error);
+      setIsAIGenerating(false);
+    },
+  });
 
   // TenTap editor setup
   const editor = useEditorBridge({
@@ -154,6 +180,85 @@ export default function Diary() {
     }
   }, [title, latestDiary, editorContent, debouncedSave]);
 
+  // Stream AI content to editor
+  useEffect(() => {
+    const updateEditor = async () => {
+      if (messages.length === 0) return;
+
+      // Get the last assistant message
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant") {
+        // Extract text from parts
+        const textPart = lastMessage.parts.find((part) => part.type === "text");
+        if (textPart && textPart.type === "text") {
+          // Convert markdown to HTML
+          const htmlContent = await marked(textPart.text);
+          // Update editor content
+          editor.setContent(htmlContent);
+        }
+      }
+    };
+
+    updateEditor();
+  }, [messages, editor]);
+
+  // Handle AI generation state changes
+  useEffect(() => {
+    const handleCompletion = async () => {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.role === "assistant") {
+        // Check if streaming is complete (no more updates expected)
+        const textPart = lastMessage.parts.find((part) => part.type === "text");
+        if (textPart && textPart.type === "text" && textPart.text.length > 0) {
+          // AI generation completed
+          setIsAIGenerating(false);
+
+          // Save the final AI-generated content
+          if (latestDiary) {
+            const htmlContent = await marked(textPart.text);
+            debouncedSave(latestDiary.id, title, htmlContent);
+          }
+        }
+      }
+    };
+
+    handleCompletion();
+  }, [messages, latestDiary, title, debouncedSave]);
+
+  // AI prompt handlers
+  const handleSendAIPrompt = () => {
+    if (aiPrompt.trim().length === 0 || !latestDiary) return;
+
+    // Save current content as backup
+    setOriginalContent(editorContent || latestDiary.content || EMPTY_HTML);
+    setIsAIGenerating(true);
+
+    // Get current diary content
+    const currentContent = editorContent || latestDiary.content || "";
+
+    // Construct prompt with diary context
+    const promptWithContext = currentContent
+      ? `I have a diary with the following content:\n\n${currentContent}\n\n${aiPrompt}\n\nPlease respond in markdown format.`
+      : `${aiPrompt}\n\nPlease respond in markdown format.`;
+
+    // Send prompt
+    sendMessage({
+      text: promptWithContext,
+    });
+
+    setAiPrompt("");
+    Keyboard.dismiss();
+  };
+
+  const handleCancelAI = () => {
+    stop();
+    setIsAIGenerating(false);
+
+    // Restore original content
+    if (originalContent) {
+      editor.setContent(originalContent);
+    }
+  };
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: "#FFFFFF" }}
@@ -191,7 +296,89 @@ export default function Diary() {
             {isDirty && !isSaving && (
               <Text className="text-[#F31260] text-sm">Unsaved</Text>
             )}
+            {isAIGenerating && (
+              <Text className="text-[#006FEE] text-sm">AI is writing...</Text>
+            )}
           </View>
+        </View>
+
+        {/* AI Assistant Section */}
+        <View className="px-2 pb-2">
+          <Pressable
+            onPress={() => setShowAISection(!showAISection)}
+            className="flex-row items-center gap-2 py-2"
+          >
+            <Text className="text-[#006FEE] font-semibold text-base">
+              ✨ AI Assistant
+            </Text>
+            <Text className="text-[#71717A] text-sm">
+              {showAISection ? "▼" : "▶"}
+            </Text>
+          </Pressable>
+
+          {showAISection && (
+            <View className="gap-2">
+              {isAIGenerating ? (
+                <View className="flex-row items-center gap-2">
+                  <View className="flex-1 bg-[#F4F4F5] rounded-xl p-3">
+                    <Text className="text-[#71717A] text-sm">
+                      AI is generating content...
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={handleCancelAI}
+                    className="bg-[#F31260] px-4 py-3 rounded-xl"
+                  >
+                    <Text className="text-white font-semibold text-sm">Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View className="flex-row items-center gap-2">
+                  <TextInput
+                    className="flex-1 bg-[#F4F4F5] rounded-xl px-3 py-3 text-base text-[#3F3F46]"
+                    value={aiPrompt}
+                    onChangeText={setAiPrompt}
+                    placeholder="Ask AI to help with your diary..."
+                    placeholderTextColor="#71717A"
+                    editable={!isAIGenerating}
+                  />
+                  <Pressable
+                    onPress={handleSendAIPrompt}
+                    disabled={aiPrompt.trim().length === 0 || isAIGenerating}
+                    className={`px-4 py-3 rounded-xl ${
+                      aiPrompt.trim().length === 0 || isAIGenerating
+                        ? "bg-[#E4E4E7]"
+                        : "bg-[#006FEE]"
+                    }`}
+                  >
+                    <Text className="text-white font-semibold text-sm">Send</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Quick Action Buttons */}
+              {!isAIGenerating && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View className="flex-row gap-2">
+                    {[
+                      "Improve my writing",
+                      "Expand on this",
+                      "Fix grammar",
+                      "Make it more expressive",
+                    ].map((suggestion) => (
+                      <Pressable
+                        key={suggestion}
+                        onPress={() => setAiPrompt(suggestion)}
+                        className="bg-[#F4F4F5] px-3 py-2 rounded-lg"
+                      >
+                        <Text className="text-[#71717A] text-sm">{suggestion}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Editor */}
